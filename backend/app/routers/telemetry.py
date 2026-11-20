@@ -8,6 +8,7 @@ or violates field constraints. HTTP 409 is returned for duplicate event_ids.
 """
 import uuid
 import json
+import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -19,6 +20,8 @@ from ..models.collector import Collector
 from ..schemas.telemetry import TelemetryIngestPayload, MetricResponse
 from ..security.dependencies import get_current_user, get_collector_from_api_key
 from ..aiops.aiops_service import process_telemetry
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/telemetry", tags=["Telemetry"])
 
@@ -37,78 +40,90 @@ def ingest(
     - Triggers AIOps pipeline after storing
     - Writes a transfer_audit record for the Privacy Center
     """
-    # Idempotency check — reject duplicate event_ids
-    existing = db.query(TelemetryEvent).filter(
-        TelemetryEvent.event_id == payload.event_id
-    ).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Duplicate event_id: {payload.event_id} already received"
-        )
-
-    # Store the allow-listed telemetry event
-    event = TelemetryEvent(
-        id=str(uuid.uuid4()),
-        tenant_id=payload.tenant_id,
-        source_id=payload.source_id,
-        event_id=payload.event_id,
-        utc_timestamp=payload.utc_timestamp,
-        event_time=payload.event_time,
-        source_timezone=payload.source_timezone,
-        metric_category=payload.metric_category,
-        metric_value=payload.metric_value,
-        severity=payload.severity,
-        health_status=payload.health_status,
-        alert_context=payload.alert_context[:200],  # hard cap
-        collector_id=payload.collector_id,
-    )
-    db.add(event)
-
-    # Also store in metrics table for time-series queries
-    metric = Metric(
-        id=str(uuid.uuid4()),
-        tenant_id=payload.tenant_id,
-        source_id=payload.source_id,
-        category=payload.metric_category,
-        value=payload.metric_value,
-        utc_timestamp=payload.utc_timestamp,
-        event_time=payload.event_time,
-        data_source=payload.data_source,
-    )
-    db.add(metric)
-
-    # Write transfer audit record for Privacy Center
-    allowed_fields = list(TelemetryIngestPayload.model_fields.keys())
-    audit = TransferAudit(
-        id=str(uuid.uuid4()),
-        tenant_id=payload.tenant_id,
-        collector_id=payload.collector_id,
-        payload_id=payload.event_id,
-        utc_timestamp=payload.utc_timestamp,
-        fields_included=json.dumps(allowed_fields),
-        status="delivered",
-        retry_count=0,
-        payload_preview=json.dumps(payload.model_dump()),
-    )
-    db.add(audit)
-    db.commit()
-
-    # Run AIOps pipeline asynchronously (anomaly detection + correlation)
     try:
-        process_telemetry(
-            db=db,
+        # Idempotency check — reject duplicate event_ids
+        existing = db.query(TelemetryEvent).filter(
+            TelemetryEvent.event_id == payload.event_id
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Duplicate event_id: {payload.event_id} already received"
+            )
+
+        # Store the allow-listed telemetry event
+        event = TelemetryEvent(
+            id=str(uuid.uuid4()),
+            tenant_id=payload.tenant_id,
+            source_id=payload.source_id,
+            event_id=payload.event_id,
+            utc_timestamp=payload.utc_timestamp,
+            event_time=payload.event_time,
+            source_timezone=payload.source_timezone,
+            metric_category=payload.metric_category,
+            metric_value=payload.metric_value,
+            severity=payload.severity,
+            health_status=payload.health_status,
+            alert_context=payload.alert_context[:200],  # hard cap
+            collector_id=payload.collector_id,
+        )
+        db.add(event)
+
+        # Also store in metrics table for time-series queries
+        metric = Metric(
+            id=str(uuid.uuid4()),
             tenant_id=payload.tenant_id,
             source_id=payload.source_id,
             category=payload.metric_category,
             value=payload.metric_value,
-            collector_id=payload.collector_id,
+            utc_timestamp=payload.utc_timestamp,
+            event_time=payload.event_time,
+            data_source=getattr(payload, "data_source", "live"),
         )
-    except Exception as e:
-        # AIOps failure should not break ingestion
-        pass
+        db.add(metric)
 
-    return {"status": "accepted", "event_id": payload.event_id}
+        # Write transfer audit record for Privacy Center
+        allowed_fields = list(TelemetryIngestPayload.model_fields.keys())
+        audit = TransferAudit(
+            id=str(uuid.uuid4()),
+            tenant_id=payload.tenant_id,
+            collector_id=payload.collector_id,
+            payload_id=payload.event_id,
+            utc_timestamp=payload.utc_timestamp,
+            fields_included=json.dumps(allowed_fields),
+            status="delivered",
+            retry_count=0,
+            payload_preview=json.dumps(payload.model_dump()),
+        )
+        db.add(audit)
+        db.commit()
+
+        # Run AIOps pipeline (anomaly detection + correlation)
+        try:
+            process_telemetry(
+                db=db,
+                tenant_id=payload.tenant_id,
+                source_id=payload.source_id,
+                category=payload.metric_category,
+                value=payload.metric_value,
+                collector_id=payload.collector_id,
+            )
+        except Exception as aiops_err:
+            # AIOps failure must never break ingestion — log but continue
+            log.warning(f"[AIOPS] pipeline error (non-fatal): {aiops_err}")
+
+        return {"status": "accepted", "event_id": payload.event_id}
+
+    except HTTPException:
+        raise  # Re-raise 409/4xx as-is
+    except Exception as e:
+        # Log the full traceback so it appears in uvicorn output
+        log.exception(f"[INGEST] Unexpected error processing event {payload.event_id}: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ingestion failed: {type(e).__name__}: {str(e)}"
+        )
 
 
 @router.get("/metrics", response_model=List[MetricResponse])

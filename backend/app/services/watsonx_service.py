@@ -36,8 +36,8 @@ _IAM_TOKEN_URL = "https://iam.cloud.ibm.com/identity/token"
 _cached_iam_token: Optional[str] = None
 _token_expires_at: float = 0.0
 
-# Watsonx model to use (Granite is free-tier on watsonx.ai)
-_WATSONX_MODEL = "ibm/granite-3-8b-instruct"
+# Watsonx model to use — granite-4-h-small supports the text_chat function
+_WATSONX_MODEL = "ibm/granite-4-h-small"
 
 # Max tokens for the response
 _MAX_NEW_TOKENS = 500
@@ -144,26 +144,29 @@ def _build_context(db: Session, tenant_id: str, question: str) -> str:
         for c in collectors
     ]
 
-    context = f"""You are SentinelOps AI, a helpful AIOps assistant. You ONLY answer questions using the metadata below.
-You MUST NOT guess, invent, or hallucinate facts not present in the metadata.
-If the metadata does not contain enough information to answer, say so clearly.
+    nl = "\n"
+    metrics_block = nl.join(metrics_lines) if metrics_lines else "  No metrics in the last hour."
+    incidents_block = nl.join(incident_lines) if incident_lines else "  No open incidents."
+    alerts_block = nl.join(alert_lines) if alert_lines else "  No recent alerts."
+    collectors_block = nl.join(collector_lines) if collector_lines else "  No collectors registered."
 
-=== RECENT METRICS (last 1 hour) ===
-{"chr(10).join(metrics_lines) if metrics_lines else "  No metrics in the last hour."}
-
-=== OPEN INCIDENTS ===
-{"chr(10).join(incident_lines) if incident_lines else "  No open incidents."}
-
-=== RECENT ALERTS ===
-{"chr(10).join(alert_lines) if alert_lines else "  No recent alerts."}
-
-=== COLLECTOR STATUS ===
-{"chr(10).join(collector_lines) if collector_lines else "  No collectors registered."}
-
-=== OPERATOR QUESTION ===
-{question}
-
-=== YOUR ANSWER (reference specific metadata values in your response) ==="""
+    context = (
+        "You are SentinelOps AI, a helpful AIOps assistant. "
+        "You ONLY answer questions using the metadata below.\n"
+        "You MUST NOT guess, invent, or hallucinate facts not present in the metadata.\n"
+        "If the metadata does not contain enough information to answer, say so clearly.\n\n"
+        "=== RECENT METRICS (last 1 hour) ===\n"
+        f"{metrics_block}\n\n"
+        "=== OPEN INCIDENTS ===\n"
+        f"{incidents_block}\n\n"
+        "=== RECENT ALERTS ===\n"
+        f"{alerts_block}\n\n"
+        "=== COLLECTOR STATUS ===\n"
+        f"{collectors_block}\n\n"
+        "=== OPERATOR QUESTION ===\n"
+        f"{question}\n\n"
+        "=== YOUR ANSWER (reference specific metadata values in your response) ==="
+    )
     return context
 
 
