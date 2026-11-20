@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: sentinelops-tesseract-api
+    runtime: python
+    plan: free
+    branch: cloud-deployment
+    autoDeployTrigger: "off"
+    rootDir: backend
+    buildCommand: python -m pip install -r requirements.txt
+    startCommand: python -m app.bootstrap && uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --workers 1
+    healthCheckPath: /health
+    domains:
+      - api.tesseract.cv
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.2"
+      - key: APP_ENV
+        value: production
+      - key: FRONTEND_ORIGIN
+        value: https://tesseract.cv
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: INITIAL_ADMIN_EMAIL
+        sync: false
+      - key: INITIAL_ADMIN_PASSWORD
+        sync: false
+      - key: INITIAL_COLLECTOR_KEY
+        sync: false

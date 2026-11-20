@@ -117,7 +117,7 @@ ATRIA_PROJECT/
 4. Write `.gitignore`
 5. Write skeleton `README.md`
 
-**Relevant Context:** IBM watsonx credentials from master prompt — API_KEY: `Xr8zVuQqUhYjGEobgWKLi04yoZhfrkvYXQ6VzBAJEfcI`, PROJECT_ID: `c7b9ea53-e828-4a9e-837a-7c7b78902c9b`, ENDPOINT: `https://us-south.ml.cloud.ibm.com/ml/v1/text/chat?version=2023-05-29`
+**Relevant Context:** IBM watsonx credentials from master prompt — API_KEY: `<set privately in IBM Cloud and Render>`, PROJECT_ID: `c7b9ea53-e828-4a9e-837a-7c7b78902c9b`, ENDPOINT: `https://us-south.ml.cloud.ibm.com/ml/v1/text/chat?version=2023-05-29`
 
 ---
 

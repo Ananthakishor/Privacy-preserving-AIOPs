@@ -1,6 +1,7 @@
 """backend/app/schemas/telemetry.py — Strict allow-list schema for ingest."""
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Literal
+from pydantic import ConfigDict
 
 
 class TelemetryIngestPayload(BaseModel):
@@ -16,6 +17,8 @@ class TelemetryIngestPayload(BaseModel):
     This tag helps judges and operators understand data provenance at a glance.
     It is NOT sensitive — it is explicitly allowed to leave the collector.
     """
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
     tenant_id: str
     source_id: str                              # Pseudonymous identifier
     event_id: str                               # UUID — idempotency key
@@ -29,7 +32,7 @@ class TelemetryIngestPayload(BaseModel):
     alert_context: str = Field(default="", max_length=200)  # Pre-screened, max 200 chars
     collector_id: str
     # Transparency tag — safe to transmit, not sensitive
-    data_source: str = "live"                   # live|seed|simulated
+    data_source: Literal["live", "seed", "simulated"] = "live"
 
     @field_validator("metric_category")
     @classmethod

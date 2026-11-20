@@ -4,8 +4,10 @@
  */
 import axios from 'axios'
 
+export const apiOrigin = import.meta.env.VITE_API_ORIGIN || window.location.origin
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: `${apiOrigin}/api/v1`,
   timeout: 15000,
 })
 

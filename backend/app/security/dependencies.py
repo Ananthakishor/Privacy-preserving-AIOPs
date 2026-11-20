@@ -86,6 +86,8 @@ def get_collector_from_api_key(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Collector API key required"
         )
+    if len(x_collector_api_key.encode()) > 72:
+        raise HTTPException(401, "Invalid collector API key")
     collectors = db.query(Collector).all()
     for collector in collectors:
         if verify_password(x_collector_api_key, collector.api_key_hash):

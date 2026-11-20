@@ -6,6 +6,7 @@ Audit events document security-relevant actions for compliance.
 NEVER log passwords, tokens, API keys, or any secrets here.
 """
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from ..config import get_settings
@@ -23,9 +24,6 @@ def log_audit(action: str, user_id: str, tenant_id: str, details: dict = None):
         tenant_id: Which tenant this belongs to
         details: Additional safe context (no secrets)
     """
-    # Ensure the logs directory exists
-    os.makedirs(os.path.dirname(settings.audit_log_file), exist_ok=True)
-
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "action": action,
@@ -34,5 +32,10 @@ def log_audit(action: str, user_id: str, tenant_id: str, details: dict = None):
         "details": details or {}
     }
 
+    if settings.app_env == "production":
+        logging.getLogger("uvicorn.error").info("audit %s", json.dumps(entry))
+        return
+
+    os.makedirs(os.path.dirname(settings.audit_log_file) or ".", exist_ok=True)
     with open(settings.audit_log_file, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")

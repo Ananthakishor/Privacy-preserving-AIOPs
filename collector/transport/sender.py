@@ -10,7 +10,7 @@ Delivery behavior:
 - HTTP 409 = already received (idempotent) — mark as delivered
 - Records delivery status in egress proof log
 """
-import time
+import logging
 import requests
 from ..config import config
 from ..buffer.queue import enqueue, mark_delivered, increment_retry
@@ -37,7 +37,7 @@ def send_payload(payload: dict) -> bool:
             config.SAAS_INGEST_URL,
             json=payload,
             headers=headers,
-            timeout=10,
+            allow_redirects=False, timeout=10,
         )
 
         if response.status_code in (200, 201):
@@ -88,17 +88,13 @@ def retry_pending():
 
     for item in pending:
         payload = item["payload"]
-        retry_count = item["retry_count"]
-
-        # Exponential backoff: 2^retry * base_delay, capped at 300s
-        delay = min(config.RETRY_BASE_DELAY * (2 ** retry_count), 300)
 
         try:
             response = requests.post(
                 config.SAAS_INGEST_URL,
                 json=payload,
                 headers=headers,
-                timeout=10,
+                allow_redirects=False, timeout=10,
             )
 
             if response.status_code in (200, 201, 409):
@@ -123,6 +119,24 @@ def send_heartbeat(collector_id: str, cpu_pct: float, mem_pct: float, buffered_c
         "version": config.COLLECTOR_VERSION,
     }
     try:
-        requests.post(config.SAAS_HEARTBEAT_URL, json=payload, headers=headers, timeout=5)
-    except Exception:
-        pass  # Heartbeat failure is non-fatal
+        response = requests.post(config.SAAS_HEARTBEAT_URL, json=payload, headers=headers,
+                                 allow_redirects=False, timeout=5)
+        return response.status_code == 200
+    except requests.RequestException:
+        return False
+
+
+def confirm_registration():
+    url = config.SAAS_HEARTBEAT_URL.removesuffix("/heartbeat") + "/register"
+    headers = {"X-Collector-API-Key": config.COLLECTOR_API_KEY, "tenant-id": config.COLLECTOR_TENANT_ID}
+    try:
+        response = requests.post(url, headers=headers, json={"name": config.COLLECTOR_ID},
+                                 allow_redirects=False, timeout=10)
+    except (requests.ConnectionError, requests.Timeout):
+        logging.warning("Registration endpoint unreachable. Collecting under the provisioned identity.")
+        return
+    if response.status_code >= 500:
+        logging.warning("Registration service unavailable. Collecting under the provisioned identity.")
+        return
+    if response.status_code != 200 or response.json().get("collector_id") != config.COLLECTOR_ID:
+        raise RuntimeError("Cloud collector registration failed. Check the assigned identity and key.")

@@ -32,19 +32,19 @@ function RequireAuth({ children }) {
 }
 
 function AppRoutes() {
-  const { user } = useAuthStore()
+  const { token } = useAuthStore()
   const { addNotification } = useNotificationStore()
 
   // Connect WebSocket for real-time notifications
   useEffect(() => {
-    if (user?.tenant_id) {
-      connectWebSocket(user.tenant_id, (data) => {
+    if (token) {
+      return connectWebSocket(token, (data) => {
         if (data.type === 'notification' && data.data) {
           addNotification({ ...data.data, is_read: false })
         }
       })
     }
-  }, [user?.tenant_id])
+  }, [token, addNotification])
 
   return (
     <Routes>

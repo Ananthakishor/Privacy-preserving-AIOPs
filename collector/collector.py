@@ -26,13 +26,13 @@ from datetime import datetime, timezone
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from collector.config import config
+from collector.config import config, env_file
 from collector.sources.psutil_source import collect_metrics
 from collector.sources.security_source import collect_security_signals
 from collector.pipeline.normalizer import normalize_metrics
 from collector.pipeline.redactor import redact_event
 from collector.pipeline.allowlist import apply_allowlist
-from collector.transport.sender import send_payload, retry_pending, send_heartbeat
+from collector.transport.sender import send_payload, retry_pending, send_heartbeat, confirm_registration
 from collector.buffer.queue import init_buffer, count_pending
 
 logging.basicConfig(
@@ -41,8 +41,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# This is set by seed_data.py — in production would be stored after registration
-COLLECTOR_ID = "collector-alpha-01"
+COLLECTOR_ID = config.COLLECTOR_ID
 
 
 def run_collection_cycle():
@@ -106,13 +105,16 @@ def run_heartbeat_loop():
             except Exception:
                 cpu, mem = 0.0, 0.0
 
-            send_heartbeat(
+            acknowledged = send_heartbeat(
                 collector_id=COLLECTOR_ID,
                 cpu_pct=cpu,
                 mem_pct=mem,
                 buffered_count=count_pending(),
             )
-            log.info(f"[HEARTBEAT] cpu={cpu:.1f}% mem={mem:.1f}% buffered={count_pending()}")
+            if acknowledged:
+                log.info(f"[HEARTBEAT] cpu={cpu:.1f}% mem={mem:.1f}% buffered={count_pending()}")
+            else:
+                log.warning("Heartbeat was not acknowledged")
             last_sent = now
         time.sleep(1)
 
@@ -137,6 +139,11 @@ def main():
     # Initialize local buffer
     init_buffer()
     log.info("[OK] Local buffer initialized")
+
+    if env_file:
+        # Registration confirms the identity provisioned by the administrator.
+        # Offline starts can still collect and buffer under that identity.
+        confirm_registration()
 
     # Start heartbeat thread
     hb_thread = threading.Thread(target=run_heartbeat_loop, daemon=True)

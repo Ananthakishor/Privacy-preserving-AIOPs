@@ -35,6 +35,7 @@ class TelemetryEvent(Base):
     severity = Column(String, default="info")          # info|warning|critical|resolved
     health_status = Column(String, default="excellent")
     alert_context = Column(String, default="")         # max 200 chars, pre-screened
+    data_source = Column(String, default="live")
     collector_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

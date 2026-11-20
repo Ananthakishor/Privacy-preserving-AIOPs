@@ -31,6 +31,9 @@ from app.security.auth import hash_password
 
 
 def seed():
+    from app.config import get_settings
+    if get_settings().app_env == "production":
+        raise RuntimeError("Demo seeding is disabled in production")
     init_db()
     db = SessionLocal()
 

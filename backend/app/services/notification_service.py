@@ -5,6 +5,7 @@ Creates notifications and broadcasts them via WebSocket to connected clients.
 Deduplication: If the same incident already has an open (unread) notification
 of the same type, a new one is NOT created. This prevents alert fatigue.
 """
+import asyncio
 import uuid
 import json
 from datetime import datetime, timezone
@@ -15,12 +16,13 @@ from ..models.notification import Notification
 # Global WebSocket manager — set by main.py at startup
 # This is a reference to the ConnectionManager instance
 _ws_manager = None
+_ws_loop = None
 
 
-def set_ws_manager(manager):
+def set_ws_manager(manager, loop):
     """Called by main.py to inject the WebSocket manager."""
-    global _ws_manager
-    _ws_manager = manager
+    global _ws_manager, _ws_loop
+    _ws_manager, _ws_loop = manager, loop
 
 
 def create_notification(
@@ -67,8 +69,7 @@ def create_notification(
     db.refresh(notification)
 
     # Broadcast to all connected WebSocket clients for this tenant
-    if _ws_manager:
-        import asyncio
+    if _ws_manager and _ws_loop:
         payload = {
             "type": "notification",
             "data": {
@@ -81,13 +82,8 @@ def create_notification(
                 "utc_timestamp": notification.utc_timestamp,
             }
         }
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(
-                    _ws_manager.broadcast_to_tenant(tenant_id, json.dumps(payload))
-                )
-        except Exception:
-            pass  # WebSocket broadcast failure should not break ingestion
+        asyncio.run_coroutine_threadsafe(
+            _ws_manager.broadcast_to_tenant(tenant_id, json.dumps(payload)), _ws_loop
+        )
 
     return notification

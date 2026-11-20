@@ -76,7 +76,7 @@ export default function Login() {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="admin@alpha.local"
+                placeholder="you@example.com"
                 required
                 className="w-full px-3.5 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition"
               />
@@ -123,15 +123,14 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Demo credentials */}
-          <div className="mt-6 p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+          {import.meta.env.DEV && <div className="mt-6 p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
             <p className="text-xs text-gray-500 font-medium mb-2">Demo credentials:</p>
             <div className="space-y-1 text-xs text-gray-400">
               <div>Admin: <span className="text-gray-200">admin@alpha.local</span> / <span className="text-gray-200">SentinelAdmin2026!</span></div>
               <div>Operator: <span className="text-gray-200">operator@alpha.local</span> / <span className="text-gray-200">SentinelOp2026!</span></div>
               <div>Viewer (Beta): <span className="text-gray-200">viewer@beta.local</span> / <span className="text-gray-200">SentinelView2026!</span></div>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </div>

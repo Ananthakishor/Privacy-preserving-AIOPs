@@ -29,6 +29,12 @@ def register_collector(
     if not x_collector_api_key or not tenant_id:
         raise HTTPException(status_code=400, detail="X-Collector-API-Key and tenant_id headers required")
 
+    if settings.app_env == "production":
+        collector = get_collector_from_api_key(x_collector_api_key, db)
+        if collector.tenant_id != tenant_id:
+            raise HTTPException(403, "Collector tenant mismatch")
+        return {"collector_id": collector.id, "message": "Registration confirmed"}
+
     collector = Collector(
         id=str(uuid.uuid4()),
         tenant_id=tenant_id,
@@ -53,6 +59,8 @@ def heartbeat(
     db: Session = Depends(get_db),
 ):
     """Update collector heartbeat and resource metrics."""
+    if payload.tenant_id != collector.tenant_id or (settings.app_env == "production" and payload.collector_id != collector.id):
+        raise HTTPException(403, "Collector identity mismatch")
     now = datetime.now(timezone.utc)
     collector.last_heartbeat_at = now
     collector.status = "online"
@@ -83,7 +91,7 @@ def list_collectors(
 ):
     """List all collectors for the authenticated user's tenant."""
     query = db.query(Collector)
-    if current_user.role != "admin":
+    if settings.app_env == "production" or current_user.role != "admin":
         query = query.filter(Collector.tenant_id == current_user.tenant_id)
     collectors = query.all()
     result = []
@@ -113,7 +121,7 @@ def get_collector(
     c = db.query(Collector).filter(Collector.id == collector_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Collector not found")
-    if current_user.role != "admin" and c.tenant_id != current_user.tenant_id:
+    if (settings.app_env == "production" or current_user.role != "admin") and c.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=403, detail="Access denied")
     return CollectorResponse(
         id=c.id, tenant_id=c.tenant_id, name=c.name, status=c.status,

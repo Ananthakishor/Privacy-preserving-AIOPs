@@ -5,6 +5,15 @@ Shared pytest fixtures for all test modules.
 import sys
 import os
 import pytest
+import tempfile
+from pathlib import Path
+
+# The suite seeds demo data. Keep those writes outside every application database.
+_test_files = tempfile.TemporaryDirectory(prefix="sentinelops-tests-", ignore_cleanup_errors=True)
+_test_dir = Path(_test_files.name)
+os.environ["DATABASE_URL"] = "sqlite:///" + str(_test_dir / "app.db")
+os.environ["AUDIT_LOG_FILE"] = str(_test_dir / "audit.jsonl")
+os.environ["APP_ENV"] = "development"
 
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))

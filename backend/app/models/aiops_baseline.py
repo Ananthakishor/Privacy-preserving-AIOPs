@@ -43,5 +43,5 @@ class AIOpsBaseline(Base):
                           onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
-        Index("ix_baseline_source_cat", "source_id", "category", unique=True),
+        Index("ix_baseline_tenant_source_cat", "tenant_id", "source_id", "category", unique=True),
     )

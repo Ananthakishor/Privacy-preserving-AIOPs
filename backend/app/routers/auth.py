@@ -17,7 +17,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     """Authenticate user and return a JWT access token."""
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
-        log_audit("login_failed", "unknown", "unknown", {"email": form_data.username})
+        log_audit("login_failed", "unknown", "unknown")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

@@ -255,7 +255,7 @@ def ask_sentinel_ai(
         log.warning("[WATSONX] Request timed out — using rule-based fallback")
         return _rule_based_fallback(db, tenant_id, question, timeout=True)
     except requests.exceptions.HTTPError as e:
-        log.error(f"[WATSONX] HTTP error {e.response.status_code}: {e.response.text[:200]}")
+        log.error(f"[WATSONX] HTTP error {e.response.status_code}")
         return _rule_based_fallback(db, tenant_id, question)
     except Exception as e:
         log.error(f"[WATSONX] Unexpected error: {e}")

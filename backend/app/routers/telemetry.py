@@ -12,6 +12,8 @@ import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from ..config import get_settings
 from typing import List, Optional
 from ..database import get_db
 from ..models.telemetry import TelemetryEvent, Metric
@@ -40,6 +42,10 @@ def ingest(
     - Triggers AIOps pipeline after storing
     - Writes a transfer_audit record for the Privacy Center
     """
+    if payload.tenant_id != collector.tenant_id:
+        raise HTTPException(status_code=403, detail="Collector tenant mismatch")
+    if get_settings().app_env == "production" and payload.collector_id != collector.id:
+        raise HTTPException(status_code=403, detail="Collector identity mismatch")
     try:
         # Idempotency check — reject duplicate event_ids
         existing = db.query(TelemetryEvent).filter(
@@ -65,7 +71,8 @@ def ingest(
             severity=payload.severity,
             health_status=payload.health_status,
             alert_context=payload.alert_context[:200],  # hard cap
-            collector_id=payload.collector_id,
+            collector_id=collector.id,
+            data_source=payload.data_source,
         )
         db.add(event)
 
@@ -87,7 +94,7 @@ def ingest(
         audit = TransferAudit(
             id=str(uuid.uuid4()),
             tenant_id=payload.tenant_id,
-            collector_id=payload.collector_id,
+            collector_id=collector.id,
             payload_id=payload.event_id,
             utc_timestamp=payload.utc_timestamp,
             fields_included=json.dumps(allowed_fields),
@@ -106,24 +113,27 @@ def ingest(
                 source_id=payload.source_id,
                 category=payload.metric_category,
                 value=payload.metric_value,
-                collector_id=payload.collector_id,
+                collector_id=collector.id,
             )
         except Exception as aiops_err:
             # AIOps failure must never break ingestion — log but continue
-            log.warning(f"[AIOPS] pipeline error (non-fatal): {aiops_err}")
+            db.rollback()
+            log.warning("AIOps processing failed (%s)", type(aiops_err).__name__)
 
         return {"status": "accepted", "event_id": payload.event_id}
 
     except HTTPException:
         raise  # Re-raise 409/4xx as-is
-    except Exception as e:
-        # Log the full traceback so it appears in uvicorn output
-        log.exception(f"[INGEST] Unexpected error processing event {payload.event_id}: {e}")
+    except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ingestion failed: {type(e).__name__}: {str(e)}"
-        )
+        if db.query(TelemetryEvent.id).filter_by(event_id=payload.event_id).first():
+            raise HTTPException(409, "Duplicate event_id")
+        log.error("Telemetry database constraint failed")
+        raise HTTPException(500, "Telemetry storage failed") from None
+    except Exception as exc:
+        db.rollback()
+        log.error("Telemetry storage failed (%s)", type(exc).__name__)
+        raise HTTPException(500, "Telemetry storage failed") from None
 
 
 @router.get("/metrics", response_model=List[MetricResponse])
@@ -148,7 +158,9 @@ def get_metrics(
     if category:
         query = query.filter(Metric.category == category)
 
-    metrics = query.order_by(Metric.event_time.asc()).limit(500).all()
+    # Return the newest window in chronological order as the collector keeps reporting.
+    metrics = query.order_by(Metric.event_time.desc(), Metric.id.desc()).limit(500).all()
+    metrics.reverse()
     return [MetricResponse(
         id=m.id, source_id=m.source_id, category=m.category,
         value=m.value, utc_timestamp=m.utc_timestamp, event_time=m.event_time,

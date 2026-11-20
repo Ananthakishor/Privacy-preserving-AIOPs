@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Optional, List
+from ..services.audit_service import log_audit
 from ..database import get_db
 from ..models.remediation import RemediationApproval, RemediationAudit
 from ..models.incident import Incident
@@ -171,9 +172,8 @@ def propose_remediation(
     db.refresh(approval)
 
     # Log to audit service
-    from ..services.audit_service import log_audit_event
-    log_audit_event(
-        event_type="remediation_proposed",
+    log_audit(
+        action="remediation_proposed",
         user_id=current_user.id,
         tenant_id=current_user.tenant_id,
         details={
@@ -231,9 +231,8 @@ def approve_remediation(
     approval.approved_at = now
     db.commit()
 
-    from ..services.audit_service import log_audit_event
-    log_audit_event(
-        event_type="remediation_approved",
+    log_audit(
+        action="remediation_approved",
         user_id=current_user.id,
         tenant_id=current_user.tenant_id,
         details={"approval_id": approval_id, "proposed_action": approval.proposed_action},
@@ -319,9 +318,8 @@ def execute_remediation(
     db.commit()
     db.refresh(audit)
 
-    from ..services.audit_service import log_audit_event
-    log_audit_event(
-        event_type="remediation_executed",
+    log_audit(
+        action="remediation_executed",
         user_id=current_user.id,
         tenant_id=current_user.tenant_id,
         details={
@@ -357,8 +355,9 @@ def rollback_remediation(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Only operators and admins can rollback remediations.")
 
-    audit = db.query(RemediationAudit).filter(
+    audit = db.query(RemediationAudit).join(RemediationApproval).filter(
         RemediationAudit.approval_id == approval_id,
+        RemediationApproval.tenant_id == current_user.tenant_id,
     ).first()
     if not audit:
         raise HTTPException(status_code=404, detail="No executed audit record found for this approval")
@@ -368,9 +367,8 @@ def rollback_remediation(
     audit.result = "rolled_back"
     db.commit()
 
-    from ..services.audit_service import log_audit_event
-    log_audit_event(
-        event_type="remediation_rolled_back",
+    log_audit(
+        action="remediation_rolled_back",
         user_id=current_user.id,
         tenant_id=current_user.tenant_id,
         details={"approval_id": approval_id, "audit_id": audit.id},
@@ -429,8 +427,9 @@ def get_audit(
     if not approval:
         raise HTTPException(status_code=404, detail="Remediation approval not found")
 
-    audit = db.query(RemediationAudit).filter(
+    audit = db.query(RemediationAudit).join(RemediationApproval).filter(
         RemediationAudit.approval_id == approval_id,
+        RemediationApproval.tenant_id == current_user.tenant_id,
     ).first()
 
     return {
