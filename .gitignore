@@ -1,0 +1,48 @@
+﻿# Secrets
+.env
+*.pem
+*.key
+*.crt
+certs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Logs
+logs/
+*.log
+*.jsonl
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+# SQLite WAL files
+*.db-shm
+*.db-wal

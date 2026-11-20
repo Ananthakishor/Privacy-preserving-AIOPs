@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-950 text-gray-100 font-sans;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded;
+  }
+}
+
+@layer utilities {
+  .health-excellent { @apply text-green-400 bg-green-400/10 border border-green-400/30; }
+  .health-good      { @apply text-blue-400 bg-blue-400/10 border border-blue-400/30; }
+  .health-fair      { @apply text-yellow-400 bg-yellow-400/10 border border-yellow-400/30; }
+  .health-poor      { @apply text-red-400 bg-red-400/10 border border-red-400/30; }
+
+  .severity-critical { @apply text-red-400; }
+  .severity-warning  { @apply text-yellow-400; }
+  .severity-info     { @apply text-blue-400; }
+  .severity-resolved { @apply text-green-400; }
+}
