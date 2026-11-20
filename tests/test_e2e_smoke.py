@@ -1,6 +1,8 @@
 """
 tests/test_e2e_smoke.py
 End-to-end smoke test: Telemetry → Ingest → AIOps → Alert → Notification.
+
+Updated to use db session for baseline operations (baseline now persists in SQLite).
 """
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -10,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from backend.app.main import app
 from backend.app.aiops.baseline import add_sample, reset_baseline
+from backend.app.database import SessionLocal, init_db
 
 
 def test_e2e_telemetry_to_notification(client, auth_headers):
@@ -22,16 +25,21 @@ def test_e2e_telemetry_to_notification(client, auth_headers):
     """
     # Step 1: Warm up the baseline (needs 10+ samples)
     source_id = "src-e2e-test"
-    reset_baseline(source_id, "cpu")
-    for i in range(20):
-        add_sample(source_id, "cpu", 25.0 + (i * 0.1))
+    tenant_id = "tenant-alpha"
+    db = SessionLocal()
+    try:
+        reset_baseline(db, source_id, "cpu", tenant_id)
+        for i in range(20):
+            add_sample(db, source_id, "cpu", tenant_id, 25.0 + (i * 0.1))
+    finally:
+        db.close()
 
     headers = {"X-Collector-API-Key": "collector-secret-key-cicada2026"}
 
     # Step 2: Send a CPU spike (much higher than baseline of ~27%)
     spike_eid = str(uuid.uuid4())
     spike_payload = {
-        "tenant_id": "tenant-alpha",
+        "tenant_id": tenant_id,
         "source_id": source_id,
         "event_id": spike_eid,
         "utc_timestamp": datetime.now(timezone.utc).isoformat(),
@@ -43,6 +51,7 @@ def test_e2e_telemetry_to_notification(client, auth_headers):
         "health_status": "poor",
         "alert_context": "cpu spike detected",
         "collector_id": "test-e2e-collector",
+        "data_source": "simulated",
     }
     r = client.post("/api/v1/telemetry/ingest", json=spike_payload, headers=headers)
     assert r.status_code == 201, f"Ingest failed: {r.text}"

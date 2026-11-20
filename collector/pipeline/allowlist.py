@@ -27,6 +27,10 @@ ALLOWED_FIELDS = {
     "health_status",      # excellent|good|fair|poor
     "alert_context",      # Short text, max 200 chars, pre-screened
     "collector_id",       # Which collector sent this
+    # Transparency tag — explicitly approved to leave the collector.
+    # Tells SaaS whether data is live/seed/simulated for dashboard labeling.
+    # This is NOT sensitive — it describes data quality, not data content.
+    "data_source",        # live|seed|simulated
 }
 
 

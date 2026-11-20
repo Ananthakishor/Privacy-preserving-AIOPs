@@ -74,6 +74,7 @@ def ingest(
         value=payload.metric_value,
         utc_timestamp=payload.utc_timestamp,
         event_time=payload.event_time,
+        data_source=payload.data_source,
     )
     db.add(metric)
 
@@ -135,7 +136,8 @@ def get_metrics(
     metrics = query.order_by(Metric.event_time.asc()).limit(500).all()
     return [MetricResponse(
         id=m.id, source_id=m.source_id, category=m.category,
-        value=m.value, utc_timestamp=m.utc_timestamp, event_time=m.event_time
+        value=m.value, utc_timestamp=m.utc_timestamp, event_time=m.event_time,
+        data_source=m.data_source or "live",
     ) for m in metrics]
 
 

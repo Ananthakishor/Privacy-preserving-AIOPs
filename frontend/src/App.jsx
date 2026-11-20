@@ -18,6 +18,8 @@ import EgressProof from './pages/EgressProof'
 import Analytics from './pages/Analytics'
 import ActivityTimeline from './pages/ActivityTimeline'
 import Settings from './pages/Settings'
+import RemediationSimulator from './pages/RemediationSimulator'
+import Performance from './pages/Performance'
 import useAuthStore from './store/authStore'
 import { connectWebSocket } from './services/websocket'
 import useNotificationStore from './store/notificationStore'
@@ -62,6 +64,8 @@ function AppRoutes() {
               <Route path="/egress" element={<EgressProof />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/timeline" element={<ActivityTimeline />} />
+              <Route path="/remediation" element={<RemediationSimulator />} />
+              <Route path="/performance" element={<Performance />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </Layout>

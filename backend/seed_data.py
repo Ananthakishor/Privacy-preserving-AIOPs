@@ -26,6 +26,7 @@ from app.models.alert import Alert
 from app.models.incident import Incident, IncidentAlert
 from app.models.notification import Notification
 from app.models.transfer_audit import TransferAudit
+from app.models.aiops_baseline import AIOpsBaseline
 from app.security.auth import hash_password
 
 
@@ -110,7 +111,27 @@ def seed():
                 db.add(Metric(
                     id=str(uuid.uuid4()), tenant_id=tid, source_id=src,
                     category=cat, value=val, utc_timestamp=t, event_time=t,
+                    data_source="seed",   # Explicitly tagged as synthetic seed data
                 ))
+
+    # ── Seed AIOps Baselines ───────────────────────────────────
+    # Pre-populate the persistent baseline table so Z-score detection is active
+    # immediately after seeding, without waiting for 10 live collector samples.
+    import json
+    import numpy as np
+    for src, tid in [("src-alpha-01", "tenant-alpha"), ("src-beta-01", "tenant-beta")]:
+        for cat, typical_val, noise in [("cpu", 27.5, 2.5), ("memory", 48.5, 2.0), ("disk", 60.0, 0.5), ("network", 10.0, 1.0)]:
+            samples = [typical_val + (i - 10) * noise * 0.1 for i in range(20)]
+            arr = np.array(samples, dtype=float)
+            mean = float(np.mean(arr))
+            std = float(np.std(arr))
+            db.add(AIOpsBaseline(
+                source_id=src, category=cat, tenant_id=tid,
+                mean=round(mean, 4), std_dev=max(round(std, 4), 0.01),
+                sample_count=20,
+                samples_json=json.dumps([round(s, 2) for s in samples]),
+            ))
+    db.commit()
 
     # ── Sample Alerts ─────────────────────────────────────────
     incident_id = str(uuid.uuid4())

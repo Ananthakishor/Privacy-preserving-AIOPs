@@ -54,6 +54,9 @@ class Metric(Base):
     value = Column(Float, nullable=False)
     utc_timestamp = Column(String, nullable=False)
     event_time = Column(String, nullable=False)
+    # data_source tag: "live" (psutil/real), "seed" (synthetic seed_data.py), "simulated" (simulator)
+    # Displayed as a colored badge in the dashboard so viewers know data provenance.
+    data_source = Column(String, default="live")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (

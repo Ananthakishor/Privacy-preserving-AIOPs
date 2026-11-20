@@ -55,8 +55,19 @@ def run_collection_cycle():
         raw_infra = collect_metrics()
         raw_security = collect_security_signals()
 
+        # Preserve the infra data_source tag before merging security signals.
+        # Security source may have a different data_source (e.g. "simulated" when
+        # wevtutil is unavailable) — we don't want it to overwrite the "live" tag
+        # for all infrastructure metrics.
+        infra_data_source = raw_infra.get("data_source", "live")
+
         # Merge security signals into infra raw record
         raw_infra.update(raw_security)
+
+        # Restore the infra data_source for infra metrics; security events
+        # will use their own data_source (set in normalizer from the security raw dict)
+        raw_infra["data_source"] = infra_data_source
+        raw_infra["_security_data_source"] = raw_security.get("data_source", "live")
 
         # Step 2: Normalize — convert to list of metric events
         events = normalize_metrics(raw_infra, collector_id=COLLECTOR_ID)

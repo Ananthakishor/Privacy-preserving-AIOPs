@@ -11,10 +11,12 @@ from .recommendation import Recommendation
 from .heartbeat import CollectorHeartbeat
 from .transfer_audit import TransferAudit
 from .remediation import RemediationApproval, RemediationAudit
+from .aiops_baseline import AIOpsBaseline
 
 __all__ = [
     "Tenant", "User", "Collector", "MonitoredSource",
     "TelemetryEvent", "Metric", "Alert", "Incident", "IncidentAlert",
     "Notification", "Recommendation", "CollectorHeartbeat",
     "TransferAudit", "RemediationApproval", "RemediationAudit",
+    "AIOpsBaseline",
 ]

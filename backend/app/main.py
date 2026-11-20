@@ -133,7 +133,7 @@ app.add_middleware(
 )
 
 # ── Register all API routers ──────────────────────────────────────────────────
-from .routers import auth, collectors, telemetry, alerts, incidents, notifications, aiops, privacy, reports
+from .routers import auth, collectors, telemetry, alerts, incidents, notifications, aiops, privacy, reports, remediation, performance
 
 app.include_router(auth.router)
 app.include_router(collectors.router)
@@ -144,6 +144,9 @@ app.include_router(notifications.router)
 app.include_router(aiops.router)
 app.include_router(privacy.router)
 app.include_router(reports.router)
+app.include_router(reports.status_router)
+app.include_router(remediation.router)
+app.include_router(performance.router)
 
 
 @app.get("/health")

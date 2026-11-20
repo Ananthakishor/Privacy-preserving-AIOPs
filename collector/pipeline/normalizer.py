@@ -24,6 +24,8 @@ def normalize_metrics(raw: dict, collector_id: str = None) -> list:
     """
     now = datetime.now(timezone.utc).isoformat()
     collection_time = raw.get("collection_timestamp", now)
+    # Carry the data_source tag forward from the source (live/seed/simulated)
+    data_source = raw.get("data_source", "live")
 
     events = []
 
@@ -35,6 +37,7 @@ def normalize_metrics(raw: dict, collector_id: str = None) -> list:
             value=raw["cpu_percent"],
             event_time=collection_time,
             extra={"raw_hostname": raw.get("hostname", "unknown")},
+            data_source=data_source,
         ))
 
     # Memory metric
@@ -45,6 +48,7 @@ def normalize_metrics(raw: dict, collector_id: str = None) -> list:
             value=raw["memory_percent"],
             event_time=collection_time,
             extra={"raw_hostname": raw.get("hostname", "unknown")},
+            data_source=data_source,
         ))
 
     # Disk metric
@@ -54,9 +58,10 @@ def normalize_metrics(raw: dict, collector_id: str = None) -> list:
             category="disk",
             value=raw["disk_percent"],
             event_time=collection_time,
+            data_source=data_source,
         ))
 
-    # Network latency
+    # Network latency (now real ICMP ping — labeled "live")
     if "simulated_latency_ms" in raw:
         events.append(_make_event(
             collector_id=collector_id,
@@ -64,10 +69,12 @@ def normalize_metrics(raw: dict, collector_id: str = None) -> list:
             value=raw["simulated_latency_ms"],
             event_time=collection_time,
             extra={"metric_subtype": "latency_ms"},
+            data_source=data_source,
         ))
 
-    # Security signals
+    # Security signals — use the security-specific data_source tag if present
     if "failed_login_count" in raw:
+        security_ds = raw.get("_security_data_source", raw.get("data_source", "live"))
         events.append(_make_event(
             collector_id=collector_id,
             category="security",
@@ -80,6 +87,7 @@ def normalize_metrics(raw: dict, collector_id: str = None) -> list:
                 "_raw_usernames": raw.get("_raw_usernames_attempted", []),
                 "_raw_source_ips": raw.get("_raw_source_ips", []),
             },
+            data_source=security_ds,
         ))
 
     # Also preserve the raw config snippet field to demonstrate redaction
@@ -90,7 +98,14 @@ def normalize_metrics(raw: dict, collector_id: str = None) -> list:
     return events
 
 
-def _make_event(collector_id: str, category: str, value: float, event_time: str, extra: dict = None) -> dict:
+def _make_event(
+    collector_id: str,
+    category: str,
+    value: float,
+    event_time: str,
+    extra: dict = None,
+    data_source: str = "live",
+) -> dict:
     """Create a single normalized metric event with a unique ID."""
     event = {
         # Fields that WILL be in the outgoing payload
@@ -106,6 +121,8 @@ def _make_event(collector_id: str, category: str, value: float, event_time: str,
         "severity": "info",          # Will be updated by health classifier
         "health_status": "excellent", # Will be updated by health classifier
         "alert_context": "",
+        # Transparency tag: "live" for real psutil data
+        "data_source": data_source,
     }
     if extra:
         event.update(extra)

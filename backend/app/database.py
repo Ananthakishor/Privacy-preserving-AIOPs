@@ -51,6 +51,7 @@ def init_db():
     from .models import (  # noqa: F401
         tenant, user, collector, monitored_source,
         telemetry, alert, incident, notification,
-        recommendation, heartbeat, transfer_audit, remediation
+        recommendation, heartbeat, transfer_audit, remediation,
+        aiops_baseline
     )
     Base.metadata.create_all(bind=engine)

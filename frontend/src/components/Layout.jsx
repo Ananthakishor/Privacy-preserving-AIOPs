@@ -7,7 +7,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Server, Network, Shield, Brain, Bell,
   AlertTriangle, GitMerge, Radio, Lock, BarChart3, Clock,
-  Settings, LogOut, Menu, X, Zap, ChevronRight
+  Settings, LogOut, Menu, X, Zap, ChevronRight, PlayCircle, Activity
 } from 'lucide-react'
 import NotificationBell from './NotificationBell'
 import useAuthStore from '../store/authStore'
@@ -25,6 +25,8 @@ const NAV_ITEMS = [
   { to: '/egress', icon: Lock, label: 'Egress Proof / Privacy' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics & Reports' },
   { to: '/timeline', icon: Clock, label: 'Activity Timeline' },
+  { to: '/remediation', icon: PlayCircle, label: 'Remediation Sim' },
+  { to: '/performance', icon: Activity, label: 'Performance' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 

@@ -8,6 +8,13 @@ class TelemetryIngestPayload(BaseModel):
     The ONLY fields allowed to travel from collector to SaaS backend.
     Any field not listed here is rejected at schema validation (422).
     This is the allow-list enforcement at the API boundary.
+
+    data_source is an optional transparency tag added in hackathon v2:
+      "live"      — real psutil/ICMP measurement from actual hardware
+      "seed"      — synthetic seed data inserted for baseline warm-up
+      "simulated" — injected by the telemetry simulator for demos
+    This tag helps judges and operators understand data provenance at a glance.
+    It is NOT sensitive — it is explicitly allowed to leave the collector.
     """
     tenant_id: str
     source_id: str                              # Pseudonymous identifier
@@ -21,6 +28,8 @@ class TelemetryIngestPayload(BaseModel):
     health_status: str = "excellent"            # excellent|good|fair|poor
     alert_context: str = Field(default="", max_length=200)  # Pre-screened, max 200 chars
     collector_id: str
+    # Transparency tag — safe to transmit, not sensitive
+    data_source: str = "live"                   # live|seed|simulated
 
     @field_validator("metric_category")
     @classmethod
@@ -54,6 +63,7 @@ class MetricResponse(BaseModel):
     value: float
     utc_timestamp: str
     event_time: str
+    data_source: str = "live"
 
     class Config:
         from_attributes = True

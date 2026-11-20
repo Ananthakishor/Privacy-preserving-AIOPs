@@ -7,10 +7,13 @@ that normally runs at 20-35%, even if the fixed critical threshold is 90%.
 
 Z-score measures how many standard deviations a value is from its recent mean.
 A Z-score above ANOMALY_THRESHOLD (default 2.5) triggers an anomaly alert.
+
+Baselines are now persisted in SQLite (via baseline.py) so detection state
+survives backend restarts.
 """
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Tuple
+from typing import Optional
 from sqlalchemy.orm import Session
 
 from .baseline import add_sample, get_baseline_stats, is_warmup
@@ -19,8 +22,9 @@ from ..models.alert import Alert
 # Trigger anomaly when value deviates more than this many standard deviations
 ANOMALY_THRESHOLD = 2.5
 
-# Severity based on Z-score magnitude
+
 def _zscore_to_severity(zscore: float) -> str:
+    """Map Z-score magnitude to alert severity."""
     if zscore >= 4.0:
         return "critical"
     elif zscore >= 3.0:
@@ -39,7 +43,7 @@ def check_anomaly(
     """
     Check if a metric value is anomalous compared to its recent baseline.
 
-    1. Add the value to the rolling baseline window.
+    1. Add the value to the rolling baseline window (persisted in SQLite).
     2. If in warm-up state, return None (no detection yet).
     3. Compute Z-score: (value - mean) / std_dev
     4. If Z-score > ANOMALY_THRESHOLD, create and persist an Alert.
@@ -47,12 +51,12 @@ def check_anomaly(
     Returns the Alert if an anomaly was detected, None otherwise.
     """
     # Always update baseline first (before checking)
-    add_sample(source_id, category, value)
+    add_sample(db, source_id, category, tenant_id, value)
 
-    if is_warmup(source_id, category):
+    if is_warmup(db, source_id, category, tenant_id):
         return None  # Not enough history yet
 
-    stats = get_baseline_stats(source_id, category)
+    stats = get_baseline_stats(db, source_id, category, tenant_id)
     if stats is None:
         return None
 
