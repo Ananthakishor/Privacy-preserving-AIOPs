@@ -44,9 +44,15 @@ class CollectorConfig:
 
 config = CollectorConfig()
 if env_file:
-    expected = "https://api.tesseract.cv/api/v1"
-    if (config.SAAS_INGEST_URL != expected + "/telemetry/ingest"
-            or config.SAAS_HEARTBEAT_URL != expected + "/collectors/heartbeat"):
+    approved_origins = (
+        "https://sentinelops-tesseract-api.onrender.com",
+        "https://api.tesseract.cv",
+    )
+    if not any(
+        config.SAAS_INGEST_URL == origin + "/api/v1/telemetry/ingest"
+        and config.SAAS_HEARTBEAT_URL == origin + "/api/v1/collectors/heartbeat"
+        for origin in approved_origins
+    ):
         raise RuntimeError("Cloud collector requires the approved HTTPS API endpoints")
     if not 32 <= len(config.COLLECTOR_API_KEY.encode()) <= 72:
         raise RuntimeError("Cloud collector requires its assigned production key")
