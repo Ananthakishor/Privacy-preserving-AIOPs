@@ -13,6 +13,7 @@ def test_production_settings():
     settings = dict(app_env="production", secret_key=token_hex(32),
                     frontend_origin="https://tesseract.cv", database_url="postgresql://localhost/test")
     assert Settings(**settings).app_env == "production"
+    assert Settings(**{**settings, "frontend_origin": "https://sentinelops-frontend-tau.vercel.app"}).app_env == "production"
     for invalid in ({"database_url": "sqlite:///test.db"}, {"secret_key": "demo"}, {"frontend_origin": "*"}):
         with pytest.raises(ValueError):
             Settings(**{**settings, **invalid})

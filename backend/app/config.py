@@ -41,7 +41,10 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_production(self):
         if self.app_env == "production":
-            if self.frontend_origin != "https://tesseract.cv":
+            if self.frontend_origin not in {
+                "https://tesseract.cv",
+                "https://sentinelops-frontend-tau.vercel.app",
+            }:
                 raise ValueError("Set FRONTEND_ORIGIN to the approved Vercel origin")
             if len(self.secret_key.encode()) < 32 or self.secret_key.startswith("change-me"):
                 raise ValueError("Set a randomly generated production SECRET_KEY")

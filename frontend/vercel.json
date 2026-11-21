@@ -4,7 +4,6 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "build": { "env": { "VITE_API_ORIGIN": "https://api.tesseract.cv" } },
   "git": { "deploymentEnabled": false },
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
